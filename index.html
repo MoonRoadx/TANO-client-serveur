@@ -106,7 +106,264 @@
   <!-- ============ APP LOGIC ============ -->
   <script>
     const MECHANIC_PIN = "1234";
-    const USE_FIREBASE = true; // ✅ Firebase activé
+    const USE_FIREBASE = true; // ✅ RÉACTIVÉ - Firebase fonctionne !
+
+    // ============ MULTILANGUE ============
+    const translations = {
+      it: {
+        appName: "Tano Evoluzione",
+        appSubtitle: "Bosch car Service",
+        loginTitle: "Inserisci il codice:",
+        loginPlaceholder: "Codice Meccanico o Cliente",
+        loginButton: "Accedi",
+        loginMechanic: "Meccanico: Usa il PIN",
+        loginClient: "Cliente: Usa il codice ricevuto o clicca sul link",
+        loginRealtimeSync: "Dati sincronizzati in tempo reale",
+        mechanicMode: "Modo Meccanico",
+        clientMode: "Modalità Cliente - Solo Lettura",
+        logout: "Esci",
+        back: "Indietro",
+        newVehicle: "Nuovo Veicolo",
+        addVehicle: "Aggiungi Veicolo",
+        plate: "Targa",
+        brand: "Marca",
+        model: "Modello",
+        year: "Anno",
+        mileage: "Chilometraggio",
+        vehicles: "Veicoli",
+        noVehicles: "Nessun veicolo registrato",
+        noVehiclesFound: "Nessun veicolo trovato",
+        search: "Cerca veicolo...",
+        shareAccess: "Condividi Accesso Cliente",
+        vehicle: "Veicolo",
+        directLink: "Link diretto",
+        manualCode: "Codice manuale",
+        copyLink: "Copia Link",
+        sendWhatsApp: "Invia via WhatsApp",
+        sendEmail: "Invia via Email",
+        close: "Chiudi",
+        realtimeMessage: "Dati sincronizzati su Firebase | Accessibile da qualsiasi dispositivo",
+        clientReadOnly: "Il cliente potrà vedere solo lo storico di questo veicolo",
+        newIntervention: "Nuovo Intervento",
+        history: "Storico",
+        noInterventions: "Nessun intervento registrato",
+        date: "Data",
+        type: "Tipo",
+        description: "Descrizione",
+        parts: "Ricambi",
+        cost: "Costo",
+        mechanic: "Meccanico",
+        notes: "Note",
+        save: "Salva",
+        cancel: "Annulla",
+        delete: "Eliminare",
+        deleteConfirm: "Eliminare questo intervento?",
+        deleteVehicleConfirm: "Eliminare definitivamente il veicolo",
+        selectType: "Seleziona...",
+        interventionDetails: "Dettagli intervento...",
+        partsExample: "Es: Pastiglie anteriori...",
+        mechanicName: "Nome meccanico",
+        observations: "Osservazioni, raccomandazioni...",
+        exportCSV: "Esporta CSV",
+        link: "Link",
+        newButton: "Nuovo",
+        vehicleNotFound: "Veicolo non trovato",
+        backToLogin: "Torna all'accesso",
+        accessDenied: "Accesso negato",
+        plateRequired: "Targa obbligatoria",
+        vehicleExists: "Veicolo già esistente",
+        typeDescRequired: "Tipo e descrizione obbligatori",
+        invalidCode: "Codice non valido",
+        mechanicAccess: "Accesso meccanico",
+        welcome: "Benvenuto",
+        autoAccess: "Accesso automatico effettuato",
+        linkInvalid: "Link non valido o scaduto",
+        vehicleAdded: "Veicolo aggiunto con successo",
+        dataSaved: "Dati salvati",
+        csvExported: "CSV esportato",
+        linkCopied: "Link copiato negli appunti",
+        disconnected: "Disconnesso",
+        logoutConfirm: "Sei sicuro di voler uscire?",
+        interventions: "interventi",
+        required: "*"
+      },
+      fr: {
+        appName: "Tano Evoluzione",
+        appSubtitle: "Bosch car Service",
+        loginTitle: "Entrez le code:",
+        loginPlaceholder: "Code Mécanicien ou Client",
+        loginButton: "Connexion",
+        loginMechanic: "Mécanicien: Utilisez le PIN",
+        loginClient: "Client: Utilisez le code reçu ou cliquez sur le lien",
+        loginRealtimeSync: "Données synchronisées en temps réel",
+        mechanicMode: "Mode Mécanicien",
+        clientMode: "Mode Client - Lecture seule",
+        logout: "Déconnexion",
+        back: "Retour",
+        newVehicle: "Nouveau Véhicule",
+        addVehicle: "Ajouter un Véhicule",
+        plate: "Plaque",
+        brand: "Marque",
+        model: "Modèle",
+        year: "Année",
+        mileage: "Kilométrage",
+        vehicles: "Véhicules",
+        noVehicles: "Aucun véhicule enregistré",
+        noVehiclesFound: "Aucun véhicule trouvé",
+        search: "Rechercher un véhicule...",
+        shareAccess: "Partager l'Accès Client",
+        vehicle: "Véhicule",
+        directLink: "Lien direct",
+        manualCode: "Code manuel",
+        copyLink: "Copier le Lien",
+        sendWhatsApp: "Envoyer via WhatsApp",
+        sendEmail: "Envoyer via Email",
+        close: "Fermer",
+        realtimeMessage: "Données synchronisées sur Firebase | Accessible depuis n'importe quel appareil",
+        clientReadOnly: "Le client pourra uniquement consulter l'historique de ce véhicule",
+        newIntervention: "Nouvelle Intervention",
+        history: "Historique",
+        noInterventions: "Aucune intervention enregistrée",
+        date: "Date",
+        type: "Type",
+        description: "Description",
+        parts: "Pièces",
+        cost: "Coût",
+        mechanic: "Mécanicien",
+        notes: "Notes",
+        save: "Enregistrer",
+        cancel: "Annuler",
+        delete: "Supprimer",
+        deleteConfirm: "Supprimer cette intervention?",
+        deleteVehicleConfirm: "Supprimer définitivement le véhicule",
+        selectType: "Sélectionner...",
+        interventionDetails: "Détails de l'intervention...",
+        partsExample: "Ex: Plaquettes avant...",
+        mechanicName: "Nom du mécanicien",
+        observations: "Observations, recommandations...",
+        exportCSV: "Exporter CSV",
+        link: "Lien",
+        newButton: "Nouveau",
+        vehicleNotFound: "Véhicule non trouvé",
+        backToLogin: "Retour à la connexion",
+        accessDenied: "Accès refusé",
+        plateRequired: "Plaque obligatoire",
+        vehicleExists: "Véhicule déjà existant",
+        typeDescRequired: "Type et description obligatoires",
+        invalidCode: "Code non valide",
+        mechanicAccess: "Accès mécanicien",
+        welcome: "Bienvenue",
+        autoAccess: "Accès automatique effectué",
+        linkInvalid: "Lien non valide ou expiré",
+        vehicleAdded: "Véhicule ajouté avec succès",
+        dataSaved: "Données sauvegardées",
+        csvExported: "CSV exporté",
+        linkCopied: "Lien copié dans le presse-papiers",
+        disconnected: "Déconnecté",
+        logoutConfirm: "Êtes-vous sûr de vouloir vous déconnecter?",
+        interventions: "interventions",
+        required: "*"
+      },
+      en: {
+        appName: "Tano Evoluzione",
+        appSubtitle: "Bosch car Service",
+        loginTitle: "Enter the code:",
+        loginPlaceholder: "Mechanic or Client Code",
+        loginButton: "Login",
+        loginMechanic: "Mechanic: Use the PIN",
+        loginClient: "Client: Use the received code or click on the link",
+        loginRealtimeSync: "Real-time synchronized data",
+        mechanicMode: "Mechanic Mode",
+        clientMode: "Client Mode - Read Only",
+        logout: "Logout",
+        back: "Back",
+        newVehicle: "New Vehicle",
+        addVehicle: "Add Vehicle",
+        plate: "Plate",
+        brand: "Brand",
+        model: "Model",
+        year: "Year",
+        mileage: "Mileage",
+        vehicles: "Vehicles",
+        noVehicles: "No vehicles registered",
+        noVehiclesFound: "No vehicles found",
+        search: "Search vehicle...",
+        shareAccess: "Share Client Access",
+        vehicle: "Vehicle",
+        directLink: "Direct link",
+        manualCode: "Manual code",
+        copyLink: "Copy Link",
+        sendWhatsApp: "Send via WhatsApp",
+        sendEmail: "Send via Email",
+        close: "Close",
+        realtimeMessage: "Data synchronized on Firebase | Accessible from any device",
+        clientReadOnly: "The client will only be able to view the history of this vehicle",
+        newIntervention: "New Intervention",
+        history: "History",
+        noInterventions: "No interventions registered",
+        date: "Date",
+        type: "Type",
+        description: "Description",
+        parts: "Parts",
+        cost: "Cost",
+        mechanic: "Mechanic",
+        notes: "Notes",
+        save: "Save",
+        cancel: "Cancel",
+        delete: "Delete",
+        deleteConfirm: "Delete this intervention?",
+        deleteVehicleConfirm: "Permanently delete the vehicle",
+        selectType: "Select...",
+        interventionDetails: "Intervention details...",
+        partsExample: "Ex: Front brake pads...",
+        mechanicName: "Mechanic name",
+        observations: "Observations, recommendations...",
+        exportCSV: "Export CSV",
+        link: "Link",
+        newButton: "New",
+        vehicleNotFound: "Vehicle not found",
+        backToLogin: "Back to login",
+        accessDenied: "Access denied",
+        plateRequired: "Plate required",
+        vehicleExists: "Vehicle already exists",
+        typeDescRequired: "Type and description required",
+        invalidCode: "Invalid code",
+        mechanicAccess: "Mechanic access",
+        welcome: "Welcome",
+        autoAccess: "Automatic access granted",
+        linkInvalid: "Invalid or expired link",
+        vehicleAdded: "Vehicle added successfully",
+        dataSaved: "Data saved",
+        csvExported: "CSV exported",
+        linkCopied: "Link copied to clipboard",
+        disconnected: "Disconnected",
+        logoutConfirm: "Are you sure you want to logout?",
+        interventions: "interventions",
+        required: "*"
+      }
+    };
+
+    let currentLang = localStorage.getItem('app_language') || 'it';
+
+    function t(key) {
+      return translations[currentLang][key] || translations.it[key] || key;
+    }
+
+    function setLanguage(lang) {
+      currentLang = lang;
+      localStorage.setItem('app_language', lang);
+      render();
+    }
+
+    function getLanguageSelector() {
+      return `
+        <select onchange="setLanguage(this.value)" class="px-3 py-2 rounded-lg text-sm font-semibold bg-gray-700 text-white border-2 border-gray-600 hover:bg-gray-600 cursor-pointer" style="background-color: rgba(55,65,81,0.95) !important; color: white !important;">
+          <option value="it" ${currentLang === 'it' ? 'selected' : ''}>🇮🇹 Italiano</option>
+          <option value="fr" ${currentLang === 'fr' ? 'selected' : ''}>🇫🇷 Français</option>
+          <option value="en" ${currentLang === 'en' ? 'selected' : ''}>🇬🇧 English</option>
+        </select>
+      `;
+    }
 
     let vehicles = {};
     let currentVehicle = null;
@@ -366,14 +623,22 @@
       };
 
       vehicles[targa] = vehicleData;
+      
+      console.log('✅ Véhicule ajouté:', targa);
+      console.log('📦 Vehicles:', vehicles);
+      
       saveDataLocal();
       
       // Clear form
-      document.getElementById('newVehicleTarga').value = '';
-      document.getElementById('newVehicleMarca').value = '';
-      document.getElementById('newVehicleModello').value = '';
-      document.getElementById('newVehicleAnno').value = '';
-      document.getElementById('newVehicleKm').value = '';
+      try {
+        document.getElementById('newVehicleTarga').value = '';
+        document.getElementById('newVehicleMarca').value = '';
+        document.getElementById('newVehicleModello').value = '';
+        document.getElementById('newVehicleAnno').value = '';
+        document.getElementById('newVehicleKm').value = '';
+      } catch(e) {
+        console.error('Form clear error:', e);
+      }
       
       showNotification('✅ Veicolo aggiunto con successo');
       
@@ -384,8 +649,9 @@
         });
       }
       
-      // DO NOT change currentVehicle, stay on list
-      render();
+      // Force stay on list - DO NOT set currentVehicle
+      console.log('🔄 Re-rendering list...');
+      setTimeout(() => render(), 100);
     }
 
     async function addIntervento() {
@@ -568,23 +834,26 @@
       if (showLoginScreen) {
         app.innerHTML = `
           <div class="min-h-screen flex items-center justify-center p-4">
-            <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+            <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full relative">
+              <div class="absolute top-4 right-4">
+                ${getLanguageSelector()}
+              </div>
               <img src="logo.png" alt="TANO Logo" class="h-24 w-24 mx-auto mb-6 object-contain" onerror="this.style.display='none'">
-              <h1 class="text-3xl font-bold mb-2 text-center">Tano Evoluzione</h1>
-              <p class="text-gray-400 mb-8 text-center">Bosch car Service ☁️</p>
+              <h1 class="text-3xl font-bold mb-2 text-center">${t('appName')}</h1>
+              <p class="text-gray-400 mb-8 text-center">${t('appSubtitle')} ☁️</p>
               <div class="space-y-4">
                 <div>
-                  <label class="block text-sm font-semibold mb-2" style="color:#e5e7eb !important">Inserisci il codice:</label>
-                  <input type="text" id="loginCode" placeholder="Codice Meccanico o Cliente"
+                  <label class="block text-sm font-semibold mb-2" style="color:#e5e7eb !important">${t('loginTitle')}</label>
+                  <input type="text" id="loginCode" placeholder="${t('loginPlaceholder')}"
                     class="w-full px-4 py-3 border-2 rounded-lg text-center text-xl font-bold uppercase"
                     onkeypress="if(event.key==='Enter') login()" autofocus>
                 </div>
-                <button onclick="login()" class="w-full bg-blue-600 text-white py-4 rounded-lg font-semibold hover:bg-blue-700">🔓 Accedi</button>
+                <button onclick="login()" class="w-full bg-blue-600 text-white py-4 rounded-lg font-semibold hover:bg-blue-700">🔓 ${t('loginButton')}</button>
                 <div class="mt-6 pt-6 border-t border-gray-700">
                   <p class="text-xs text-gray-500 text-center">
-                    🔧 <strong>Meccanico:</strong> Usa il PIN<br>
-                    👤 <strong>Cliente:</strong> Usa il codice ricevuto o clicca sul link<br>
-                    ☁️ <strong>Dati sincronizzati in tempo reale</strong>
+                    🔧 <strong>${t('loginMechanic')}</strong><br>
+                    👤 <strong>${t('loginClient')}</strong><br>
+                    ☁️ <strong>${t('loginRealtimeSync')}</strong>
                   </p>
                 </div>
               </div>
