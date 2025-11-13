@@ -367,9 +367,20 @@
 
       vehicles[targa] = vehicleData;
       saveDataLocal();
-      await syncToFirestore(targa, vehicleData);
       
-      currentVehicle = targa;
+      // Sync to Firestore (non-blocking)
+      syncToFirestore(targa, vehicleData).catch(err => {
+        console.error('Sync error:', err);
+      });
+      
+      // Clear form
+      document.getElementById('newVehicleTarga').value = '';
+      document.getElementById('newVehicleMarca').value = '';
+      document.getElementById('newVehicleModello').value = '';
+      document.getElementById('newVehicleAnno').value = '';
+      document.getElementById('newVehicleKm').value = '';
+      
+      showNotification('✅ Veicolo aggiunto con successo');
       render();
     }
 
