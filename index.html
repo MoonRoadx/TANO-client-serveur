@@ -61,15 +61,52 @@
     .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
     .modal-content { background: rgba(30,30,35,0.95); border-radius: 12px; padding: 24px; max-width: 500px; width: 100%; border: 1px solid rgba(255,255,255,0.15); }
     #qrcode { display: flex; justify-content: center; padding: 20px; background: white; border-radius: 8px; margin: 16px 0; }
+    .loading {
+      display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%; border-top-color: #fff; animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 
 <body>
-  <div id="app">Caricamento...</div>
+  <div id="app">
+    <div class="min-h-screen flex items-center justify-center">
+      <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
+        <div class="loading mx-auto mb-4"></div>
+        <p class="text-gray-300">Caricamento Firebase...</p>
+      </div>
+    </div>
+  </div>
 
-  <!-- ============ APP LOGIC (UI) ============ -->
+  <!-- ============ FIREBASE INITIALIZATION ============ -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
+    import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBiU0hQ_xfHBLlGHh0vbeZpBAc1uoRz554",
+      authDomain: "tano-client-serveur.firebaseapp.com",
+      projectId: "tano-client-serveur",
+      storageBucket: "tano-client-serveur.firebasestorage.app",
+      messagingSenderId: "83806701673",
+      appId: "1:83806701673:web:6e44a0ebd99ea0a75cfaf8"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    
+    window.firebaseDB = db;
+    window.firebaseReady = true;
+    console.log("✅ Firebase initialized");
+    
+    window.dispatchEvent(new Event('firebaseReady'));
+  </script>
+
+  <!-- ============ APP LOGIC ============ -->
   <script>
     const MECHANIC_PIN = "1234";
+    const USE_FIREBASE = true; // Mettre false pour mode localStorage uniquement
 
     let vehicles = {};
     let currentVehicle = null;
@@ -80,6 +117,7 @@
     let searchQuery = '';
     let showShareModal = false;
     let shareModalTarga = null;
+    let realtimeUnsubscribe = null;
 
     function showNotification(message, type = 'success') {
       const notification = document.createElement('div');
@@ -114,49 +152,203 @@
       return `${baseUrl}?code=${encodeURIComponent(code)}`;
     }
 
-    function checkUrlParams() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get('code');
-      if (code) {
-        const targa = verifyClientCode(code);
-        if (targa) {
-          isClientMode = true; isMechanicMode = false; showLoginScreen = false; currentVehicle = targa;
-          showNotification('✅ Accesso automatico effettuato');
-          window.history.replaceState({}, document.title, window.location.pathname);
-        } else {
-          showNotification('❌ Link non valido o scaduto', 'error');
-        }
+    // ============ FIREBASE SYNC ============
+    async function syncToFirestore(targa, vehicleData) {
+      if (!USE_FIREBASE || !window.firebaseDB) return;
+      try {
+        const { setDoc, doc } = await import("https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js");
+        const vehicleRef = doc(window.firebaseDB, 'vehicles', targa);
+        await setDoc(vehicleRef, vehicleData);
+        console.log('✅ Synced to Firestore:', targa);
+      } catch (error) {
+        console.error('❌ Firestore sync error:', error);
+        showNotification('⚠️ Sync error, but saved locally', 'error');
       }
     }
 
-    /* plus de loadData/saveData ici – on utilisera window.loadData / window.saveData */
+    async function loadFromFirestore(targa) {
+      if (!USE_FIREBASE || !window.firebaseDB) return null;
+      try {
+        const { getDoc, doc } = await import("https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js");
+        const vehicleRef = doc(window.firebaseDB, 'vehicles', targa);
+        const docSnap = await getDoc(vehicleRef);
+        if (docSnap.exists()) {
+          console.log('✅ Loaded from Firestore:', targa);
+          return docSnap.data();
+        }
+        return null;
+      } catch (error) {
+        console.error('❌ Firestore load error:', error);
+        return null;
+      }
+    }
 
-    function login() {
+    async function deleteFromFirestore(targa) {
+      if (!USE_FIREBASE || !window.firebaseDB) return;
+      try {
+        const { deleteDoc, doc } = await import("https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js");
+        const vehicleRef = doc(window.firebaseDB, 'vehicles', targa);
+        await deleteDoc(vehicleRef);
+        console.log('✅ Deleted from Firestore:', targa);
+      } catch (error) {
+        console.error('❌ Firestore delete error:', error);
+      }
+    }
+
+    async function loadAllVehiclesFromFirestore() {
+      if (!USE_FIREBASE || !window.firebaseDB) {
+        loadDataLocal();
+        return;
+      }
+      
+      try {
+        const { collection, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js");
+        const vehiclesCol = collection(window.firebaseDB, 'vehicles');
+        
+        if (realtimeUnsubscribe) {
+          realtimeUnsubscribe();
+        }
+        
+        realtimeUnsubscribe = onSnapshot(vehiclesCol, (snapshot) => {
+          snapshot.docChanges().forEach((change) => {
+            const targa = change.doc.id;
+            if (change.type === 'added' || change.type === 'modified') {
+              vehicles[targa] = change.doc.data();
+            } else if (change.type === 'removed') {
+              delete vehicles[targa];
+            }
+          });
+          saveDataLocal();
+          if (!showLoginScreen) render();
+          console.log('🔄 Real-time sync updated');
+        });
+        
+        console.log('✅ Real-time sync enabled');
+      } catch (error) {
+        console.error('❌ Real-time sync error:', error);
+        loadDataLocal();
+      }
+    }
+
+    function loadDataLocal() {
+      try {
+        const stored = localStorage.getItem('garage_vehicles');
+        if (stored) {
+          vehicles = JSON.parse(stored);
+          console.log('📦 Loaded from localStorage:', Object.keys(vehicles).length, 'vehicles');
+        }
+      } catch (error) {
+        console.log('❌ localStorage error:', error);
+        vehicles = {};
+      }
+    }
+
+    function saveDataLocal() {
+      try {
+        localStorage.setItem('garage_vehicles', JSON.stringify(vehicles));
+      } catch (error) {
+        console.error('❌ localStorage save error:', error);
+      }
+    }
+
+    // ============ URL PARAMS ============
+    async function checkUrlParams() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      
+      if (code) {
+        const parts = code.toUpperCase().split('-');
+        if (parts.length >= 2) {
+          const year = parts[parts.length - 1];
+          const targa = parts.slice(0, -1).join('-');
+          
+          const vehicleData = await loadFromFirestore(targa);
+          if (vehicleData) {
+            vehicles[targa] = vehicleData;
+            saveDataLocal();
+            
+            const currentYear = new Date().getFullYear().toString();
+            const lastYear = (currentYear - 1).toString();
+            
+            if (year === currentYear || year === lastYear) {
+              isClientMode = true;
+              isMechanicMode = false;
+              showLoginScreen = false;
+              currentVehicle = targa;
+              showNotification('✅ Accesso automatico effettuato');
+              window.history.replaceState({}, document.title, window.location.pathname);
+              render();
+              return;
+            }
+          }
+        }
+        showNotification('❌ Link non valido o scaduto', 'error');
+      }
+    }
+
+    // ============ AUTH ============
+    async function login() {
       const code = document.getElementById('loginCode').value.trim();
       if (!code) return showNotification('❌ Inserisci un codice', 'error');
 
       if (code === MECHANIC_PIN) {
-        isMechanicMode = true; isClientMode = false; showLoginScreen = false; currentVehicle = null;
-        showNotification('✅ Accesso meccanico'); render(); return;
+        isMechanicMode = true;
+        isClientMode = false;
+        showLoginScreen = false;
+        currentVehicle = null;
+        showNotification('✅ Accesso meccanico');
+        await loadAllVehiclesFromFirestore();
+        render();
+        return;
       }
 
-      const targa = verifyClientCode(code);
-      if (targa) {
-        isClientMode = true; isMechanicMode = false; showLoginScreen = false; currentVehicle = targa;
-        showNotification('✅ Benvenuto'); render(); return;
+      const parts = code.toUpperCase().split('-');
+      if (parts.length >= 2) {
+        const year = parts[parts.length - 1];
+        const targa = parts.slice(0, -1).join('-');
+        
+        const vehicleData = await loadFromFirestore(targa);
+        if (vehicleData) {
+          vehicles[targa] = vehicleData;
+          saveDataLocal();
+          
+          const currentYear = new Date().getFullYear().toString();
+          const lastYear = (currentYear - 1).toString();
+          
+          if (year === currentYear || year === lastYear) {
+            isClientMode = true;
+            isMechanicMode = false;
+            showLoginScreen = false;
+            currentVehicle = targa;
+            showNotification('✅ Benvenuto');
+            render();
+            return;
+          }
+        }
       }
+
       showNotification('❌ Codice non valido', 'error');
     }
 
     function logout() {
       if (confirm('Sei sicuro di voler uscire?')) {
-        isMechanicMode = false; isClientMode = false; showLoginScreen = true;
-        currentVehicle = null; showAddForm = false; searchQuery = '';
-        showNotification('👋 Disconnesso'); render();
+        if (realtimeUnsubscribe) {
+          realtimeUnsubscribe();
+          realtimeUnsubscribe = null;
+        }
+        isMechanicMode = false;
+        isClientMode = false;
+        showLoginScreen = true;
+        currentVehicle = null;
+        showAddForm = false;
+        searchQuery = '';
+        showNotification('👋 Disconnesso');
+        render();
       }
     }
 
-    function addVehicle() {
+    // ============ VEHICLE CRUD ============
+    async function addVehicle() {
       if (!isMechanicMode) return showNotification('❌ Accesso negato', 'error');
 
       const targa = document.getElementById('newVehicleTarga').value.toUpperCase().trim();
@@ -168,17 +360,20 @@
       if (!targa) return showNotification('❌ Targa obbligatoria', 'error');
       if (vehicles[targa]) return showNotification('❌ Veicolo già esistente', 'error');
 
-      vehicles[targa] = {
+      const vehicleData = {
         targa, marca, modello, anno, chilometraggio: km,
         interventi: [], clientCode: generateClientCode(targa), createdAt: new Date().toISOString()
       };
 
-      window.saveData();
+      vehicles[targa] = vehicleData;
+      saveDataLocal();
+      await syncToFirestore(targa, vehicleData);
+      
       currentVehicle = targa;
       render();
     }
 
-    function addIntervento() {
+    async function addIntervento() {
       if (!isMechanicMode) return showNotification('❌ Accesso negato', 'error');
 
       const data = document.getElementById('interventoData').value;
@@ -200,27 +395,38 @@
       vehicles[currentVehicle].interventi.unshift(intervento);
       if (km) vehicles[currentVehicle].chilometraggio = km;
 
-      window.saveData();
+      saveDataLocal();
+      await syncToFirestore(currentVehicle, vehicles[currentVehicle]);
+      
       showAddForm = false;
       render();
     }
 
-    function deleteIntervento(id) {
+    async function deleteIntervento(id) {
       if (!isMechanicMode) return showNotification('❌ Accesso negato', 'error');
       if (!confirm('Eliminare questo intervento?')) return;
+      
       vehicles[currentVehicle].interventi = vehicles[currentVehicle].interventi.filter(i => i.id !== id);
-      window.saveData(); render();
+      saveDataLocal();
+      await syncToFirestore(currentVehicle, vehicles[currentVehicle]);
+      render();
     }
 
-    function deleteVehicle(targa) {
+    async function deleteVehicle(targa) {
       if (!isMechanicMode) return showNotification('❌ Accesso negato', 'error');
       if (!confirm(`Eliminare definitivamente il veicolo ${targa}?`)) return;
+      
       delete vehicles[targa];
-      window.saveData(); render();
+      saveDataLocal();
+      await deleteFromFirestore(targa);
+      render();
     }
 
+    // ============ SHARE MODAL ============
     function openShareModal(targa) {
-      showShareModal = true; shareModalTarga = targa; render();
+      showShareModal = true;
+      shareModalTarga = targa;
+      render();
       setTimeout(() => {
         const link = getClientLink(targa);
         const qrElement = document.getElementById('qrcode');
@@ -230,31 +436,43 @@
         }
       }, 100);
     }
-    function closeShareModal(){ showShareModal=false; shareModalTarga=null; render(); }
 
     function copyLink(targa) {
       const link = getClientLink(targa);
       if (navigator.clipboard) {
         navigator.clipboard.writeText(link).then(() => showNotification('🔗 Link copiato negli appunti'));
       } else {
-        const textarea = document.createElement('textarea'); textarea.value = link;
-        document.body.appendChild(textarea); textarea.select(); document.execCommand('copy');
-        document.body.removeChild(textarea); showNotification('🔗 Link copiato');
+        const textarea = document.createElement('textarea');
+        textarea.value = link;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showNotification('🔗 Link copiato');
       }
     }
+
     function shareViaWhatsApp(targa) {
-      const v = vehicles[targa]; const link = getClientLink(targa);
+      const v = vehicles[targa];
+      const link = getClientLink(targa);
       const msg = `Ciao! Ecco il link per consultare lo storico del tuo veicolo ${targa} (${v.marca} ${v.modello}):\n\n${link}\n\nTano Evoluzione - Bosch Car Service`;
       window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
     }
+
     function shareViaEmail(targa) {
-      const v = vehicles[targa]; const link = getClientLink(targa);
+      const v = vehicles[targa];
+      const link = getClientLink(targa);
       const subject = `Storico Veicolo ${targa}`;
       const body = `Gentile Cliente,\n\nEcco il link per consultare lo storico completo del suo veicolo ${targa} (${v.marca} ${v.modello}):\n\n${link}\n\nPotrà visualizzare tutti gli interventi effettuati sul suo veicolo in qualsiasi momento.\n\nCordiali saluti,\nTano Evoluzione - Bosch Car Service`;
       window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     }
 
-    function updateSearch(q) { searchQuery = q.toLowerCase(); render(); }
+    // ============ UTILITIES ============
+    function updateSearch(q) {
+      searchQuery = q.toLowerCase();
+      render();
+    }
+
     function getFilteredVehicles() {
       if (!searchQuery) return Object.values(vehicles);
       return Object.values(vehicles).filter(v =>
@@ -273,7 +491,10 @@
       const a = document.createElement('a');
       a.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv));
       a.setAttribute('download', vehicle.targa + '_' + new Date().toISOString().split('T')[0] + '.csv');
-      a.style.display = 'none'; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
       showNotification('📊 CSV esportato');
     }
 
@@ -285,10 +506,13 @@
       return { totalCosto, ultimoIntervento, count: interventi.length };
     }
 
+    // ============ RENDER ============
     function render() {
       const app = document.getElementById('app');
-      const modals = document.querySelectorAll('.modal'); modals.forEach(m => m.remove());
+      const modals = document.querySelectorAll('.modal');
+      modals.forEach(m => m.remove());
 
+      // SHARE MODAL
       if (showShareModal && shareModalTarga) {
         const vehicle = vehicles[shareModalTarga];
         const code = vehicle.clientCode || generateClientCode(shareModalTarga);
@@ -319,23 +543,20 @@
                 <button onclick="shareViaEmail('${shareModalTarga}')" class="w-full bg-gray-600 text-white py-3 rounded-lg font-semibold hover:bg-gray-700">📧 Invia via Email</button>
                 <button onclick="showShareModal=false; shareModalTarga=null; render();" class="w-full bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700">✕ Chiudi</button>
               </div>
-              <p class="text-xs text-gray-500 text-center mt-4">Il cliente potrà vedere solo lo storico di questo veicolo</p>
+              <p class="text-xs text-gray-500 text-center mt-4">☁️ Dati sincronizzati su Firebase | Accessibile da qualsiasi dispositivo</p>
             </div>
           </div>`;
-        setTimeout(() => {
-          const qr = document.getElementById('qrcode');
-          if (qr && typeof QRCode !== 'undefined') { qr.innerHTML=''; new QRCode(qr, { text: link, width: 200, height: 200 }); }
-        }, 100);
         return;
       }
 
+      // LOGIN SCREEN
       if (showLoginScreen) {
         app.innerHTML = `
           <div class="min-h-screen flex items-center justify-center p-4">
             <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
               <img src="logo.png" alt="TANO Logo" class="h-24 w-24 mx-auto mb-6 object-contain" onerror="this.style.display='none'">
               <h1 class="text-3xl font-bold mb-2 text-center">Tano Evoluzione</h1>
-              <p class="text-gray-400 mb-8 text-center">Bosch car Service</p>
+              <p class="text-gray-400 mb-8 text-center">Bosch car Service ☁️</p>
               <div class="space-y-4">
                 <div>
                   <label class="block text-sm font-semibold mb-2" style="color:#e5e7eb !important">Inserisci il codice:</label>
@@ -345,7 +566,11 @@
                 </div>
                 <button onclick="login()" class="w-full bg-blue-600 text-white py-4 rounded-lg font-semibold hover:bg-blue-700">🔓 Accedi</button>
                 <div class="mt-6 pt-6 border-t border-gray-700">
-                  <p class="text-xs text-gray-500 text-center">🔧 <strong>Meccanico:</strong> Usa il PIN<br>👤 <strong>Cliente:</strong> Usa il codice ricevuto o clicca sul link</p>
+                  <p class="text-xs text-gray-500 text-center">
+                    🔧 <strong>Meccanico:</strong> Usa il PIN<br>
+                    👤 <strong>Cliente:</strong> Usa il codice ricevuto o clicca sul link<br>
+                    ☁️ <strong>Dati sincronizzati in tempo reale</strong>
+                  </p>
                 </div>
               </div>
             </div>
@@ -353,6 +578,7 @@
         return;
       }
 
+      // MECHANIC LIST
       if (!currentVehicle && isMechanicMode) {
         const vehiclesList = getFilteredVehicles();
         app.innerHTML = `
@@ -363,7 +589,7 @@
                   <img src="logo.png" alt="TANO" class="h-12 w-12 object-contain rounded-lg bg-white p-1" onerror="this.style.display='none'">
                   <div>
                     <h1 class="text-2xl font-bold">Tano Evoluzione</h1>
-                    <p class="text-xs text-blue-100">🔧 Modo Meccanico</p>
+                    <p class="text-xs text-blue-100">🔧 Modo Meccanico ${USE_FIREBASE ? '☁️' : '💾'}</p>
                   </div>
                 </div>
                 <button onclick="logout()" class="px-4 py-2 bg-red-500 rounded hover:bg-red-600 font-semibold">Esci</button>
@@ -424,6 +650,7 @@
         return;
       }
 
+      // VEHICLE DETAIL
       const vehicle = vehicles[currentVehicle];
       if (!vehicle) {
         app.innerHTML = `
@@ -493,6 +720,7 @@
             </div>
           </div>`;
       } else {
+        // ADD FORM
         const today = new Date().toISOString().split('T')[0];
         app.innerHTML = `
           <div class="min-h-screen">
@@ -574,7 +802,34 @@
       }
     }
 
-    // Service Worker (facultatif)
+    // ============ INITIALIZATION ============
+    async function init() {
+      console.log('🚀 Initializing app...');
+      
+      // Wait for Firebase
+      if (!window.firebaseReady) {
+        await new Promise(resolve => {
+          window.addEventListener('firebaseReady', resolve, { once: true });
+        });
+      }
+      
+      console.log('✅ Firebase ready');
+      
+      // Load data
+      loadDataLocal();
+      
+      // Check URL params
+      await checkUrlParams();
+      
+      // Render
+      if (showLoginScreen) {
+        render();
+      }
+      
+      console.log('✅ App initialized');
+    }
+
+    // Service Worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('service-worker.js')
@@ -582,95 +837,9 @@
           .catch(err => console.log('❌ SW Error:', err));
       });
     }
-  </script>
 
-  <!-- ============ FIREBASE: init + auth anonyme + sync ============ -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
-    import { getStorage } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-storage.js";
-
-    // ⚠️ Remplace si besoin par tes infos projet
-    const firebaseConfig = {
-      apiKey: "AIzaSyAgY9J6un3pftW1t4H4tD_gliY_00Man0A",
-      authDomain: "tano-garage.firebaseapp.com",
-      projectId: "tano-garage",
-      storageBucket: "tano-garage.firebasestorage.app",
-      appId: "1:374916118237:web:f52da64bcb9234baa28d34"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db   = getFirestore(app);
-    const sto  = getStorage(app);
-    window.firebaseAuth = auth; window.firebaseDB = db; window.firebaseSto = sto;
-
-    onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        signInAnonymously(auth).catch((e) => console.error("Anon auth error:", e));
-      } else {
-        window.firebaseUser = user;
-        console.log("✅ Firebase anonyme:", user.uid);
-      }
-    });
-
-    const FIREBASE_SYNC = true; // désactive = localStorage only
-
-    function getVehiclesRef() { if (!window.vehicles) window.vehicles = {}; return window.vehicles; }
-    function setVehicles(obj) { window.vehicles = obj || {}; }
-
-    // Expose les fonctions utilisées par l'app
-    window.loadData = async function loadData(){
-      try {
-        if (FIREBASE_SYNC && window.firebaseUser) {
-          const ref = doc(db, "users", window.firebaseUser.uid, "storage", "vehicles");
-          const snap = await getDoc(ref);
-          if (snap.exists()) {
-            setVehicles(snap.data().vehicles || {});
-            console.log("⬇️ Vehicles from Firestore:", window.vehicles);
-            return;
-          }
-        }
-        const stored = localStorage.getItem('garage_vehicles');
-        setVehicles(stored ? JSON.parse(stored) : {});
-        console.log("⬇️ Vehicles from localStorage:", window.vehicles);
-      } catch (e) {
-        console.warn("loadData fallback localStorage:", e);
-        const stored = localStorage.getItem('garage_vehicles');
-        setVehicles(stored ? JSON.parse(stored) : {});
-      }
-    };
-
-    window.saveData = async function saveData(){
-      try {
-        // Toujours local
-        localStorage.setItem('garage_vehicles', JSON.stringify(getVehiclesRef()));
-
-        // Optionnel Firestore
-        if (FIREBASE_SYNC && window.firebaseUser) {
-          const ref = doc(db, "users", window.firebaseUser.uid, "storage", "vehicles");
-          await setDoc(ref, { vehicles: getVehiclesRef(), updatedAt: Date.now() }, { merge: true });
-          console.log("⬆️ Vehicles saved to Firestore");
-        }
-        if (typeof window.showNotification === "function") window.showNotification('✅ Dati salvati');
-      } catch (error) {
-        console.error('Erreur save:', error);
-        if (typeof window.showNotification === "function") window.showNotification('❌ Errore salvataggio', 'error');
-      }
-    };
-
-    // Bootstrap : attend l'auth avant de charger et rendre
-    (async () => {
-      const waitAuthReady = () =>
-        new Promise(resolve => {
-          const unsub = onAuthStateChanged(auth, (u) => { if (u) { unsub(); resolve(); } });
-        });
-      await waitAuthReady();
-      await window.loadData();       // ← Firestore ou localStorage
-      window.checkUrlParams();
-      window.render();
-    })();
+    // Start app
+    init();
   </script>
 </body>
 </html>
