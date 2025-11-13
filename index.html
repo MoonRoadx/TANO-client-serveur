@@ -806,24 +806,61 @@
     async function init() {
       console.log('🚀 Initializing app...');
       
-      // Wait for Firebase
-      if (!window.firebaseReady) {
-        await new Promise(resolve => {
-          window.addEventListener('firebaseReady', resolve, { once: true });
-        });
-      }
-      
-      console.log('✅ Firebase ready');
-      
-      // Load data
+      // Load from localStorage first (instant)
       loadDataLocal();
       
-      // Check URL params
-      await checkUrlParams();
+      // Check URL params immediately
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
       
-      // Render
-      if (showLoginScreen) {
-        render();
+      if (code) {
+        const targa = verifyClientCode(code);
+        if (targa) {
+          isClientMode = true;
+          isMechanicMode = false;
+          showLoginScreen = false;
+          currentVehicle = targa;
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      }
+      
+      // Render immediately with localStorage data
+      render();
+      
+      // Then sync with Firebase in background (non-blocking)
+      if (USE_FIREBASE) {
+        if (!window.firebaseReady) {
+          await new Promise(resolve => {
+            window.addEventListener('firebaseReady', resolve, { once: true });
+          });
+        }
+        console.log('✅ Firebase ready - syncing in background...');
+        
+        // If we have a client code in URL, load from Firestore
+        if (code && !verifyClientCode(code)) {
+          const parts = code.toUpperCase().split('-');
+          if (parts.length >= 2) {
+            const year = parts[parts.length - 1];
+            const targa = parts.slice(0, -1).join('-');
+            const vehicleData = await loadFromFirestore(targa);
+            if (vehicleData) {
+              vehicles[targa] = vehicleData;
+              saveDataLocal();
+              const currentYear = new Date().getFullYear().toString();
+              const lastYear = (currentYear - 1).toString();
+              if (year === currentYear || year === lastYear) {
+                isClientMode = true;
+                isMechanicMode = false;
+                showLoginScreen = false;
+                currentVehicle = targa;
+                showNotification('✅ Accesso automatico effettuato');
+                render();
+              }
+            } else {
+              showNotification('❌ Link non valido o scaduto', 'error');
+            }
+          }
+        }
       }
       
       console.log('✅ App initialized');
